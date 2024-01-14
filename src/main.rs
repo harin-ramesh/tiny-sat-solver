@@ -1,5 +1,5 @@
 
-fn parse_cnf(cnf: &String) -> Option<Vec<Vec<&str>>> {
+fn parse_cnf(cnf: &str) -> Option<Vec<Vec<&str>>> {
     let clauses: Vec<&str> = cnf.split("&&").collect();
     if clauses.is_empty() {
         None
@@ -15,10 +15,9 @@ fn parse_cnf(cnf: &String) -> Option<Vec<Vec<&str>>> {
 }
 
 
-
 fn main() {
     println!("Enter a CNF: ");
-    let cnf = "(a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)".to_owned().to_lowercase().replace(" ", "");
+    let cnf = "(a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)".to_lowercase().replace(" ", "");
     let conjuctions = parse_cnf(&cnf);
     dbg!(conjuctions);
 }
