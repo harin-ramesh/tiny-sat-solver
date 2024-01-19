@@ -47,11 +47,10 @@ fn parse_cnf(cnf: &str) -> Option<CNF> {
     if clauses.is_empty() {
         None
     }else{
-        let clauses: Vec<Vec<String>> = clauses.iter().map(|&clause| {
+        let clauses: Vec<Vec<&str>> = clauses.iter().map(|&clause| {
             clause.trim_start_matches("(")
                   .trim_end_matches(")")
                   .split("||")
-                  .map(|s| s.to_owned())
                   .collect()
         }).collect();
 
@@ -60,9 +59,9 @@ fn parse_cnf(cnf: &str) -> Option<CNF> {
             let mut c = Clause::new();
             for literal in clause.iter() {
                 if literal.chars().count() == 1 {
-                    c.add(Literal::Literal(literal.to_owned()));
+                    c.add(Literal::Literal(literal.to_string()));
                 } else {
-                    c.add(Literal::ComplementedLiteral(literal.to_owned()));
+                    c.add(Literal::ComplementedLiteral(literal.to_string()));
                 }
             }
             cnf.add(c);
