@@ -1,8 +1,9 @@
 
+
 #[derive(Debug)]
 enum Literal{
-    Literal(String),
-    ComplementedLiteral(String)
+    Literal(char),
+    ComplementedLiteral(char)
 }
 
 #[derive(Debug)]
@@ -59,9 +60,9 @@ fn parse_cnf(cnf: &str) -> Option<CNF> {
             let mut c = Clause::new();
             for literal in clause.iter() {
                 if literal.chars().count() == 1 {
-                    c.add(Literal::Literal(literal.to_string()));
+                    c.add(Literal::Literal(literal.chars().nth(0).unwrap().to_owned()));
                 } else {
-                    c.add(Literal::ComplementedLiteral(literal.to_string()));
+                    c.add(Literal::ComplementedLiteral(literal.chars().nth(0).unwrap().to_owned()));
                 }
             }
             cnf.add(c);
