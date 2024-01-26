@@ -1,21 +1,33 @@
-#[derive(Debug, Clone)]
+use std::hash::{Hash, Hasher};
+use std::collections::HashSet;
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum Literal {
     Literal(char),
     ComplementedLiteral(char),
 }
 
-#[derive(Debug)]
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+enum State {
+    SATISFIABLE,
+    UNSATISFIABLE,
+    UNDERTIMINED
+}
+
+#[derive(Debug, PartialEq, Eq)]
 struct Clause {
-    literals: Vec<Literal>,
+    literals: HashSet<Literal>,
+    state: State
 }
 
 impl Clause {
     fn new() -> Self {
-        Self { literals: vec![] }
+        Self { literals: HashSet::new(), state:State::UNDERTIMINED }
     }
 
     fn add(&mut self, literal: Literal) {
-        self.literals.push(literal);
+        self.literals.insert(literal);
     }
 
     fn clear(&mut self) {
@@ -25,44 +37,102 @@ impl Clause {
     fn is_empty(&self) -> bool {
         self.literals.is_empty()
     }
+
+    fn is_undertimed(&self) -> bool{
+        self.state == State::UNDERTIMINED
+    }
+
+    fn is_unstatifiable(&self) -> bool{
+        self.state == State::UNSATISFIABLE
+    }
+
+    fn is_statifiable(&self) -> bool{
+        self.state == State::SATISFIABLE
+    }
+
+    fn set_state(&mut self, state: State){
+        self.state = state;
+    }
+
+    fn reduce(&mut self, literal:&Literal) {
+        match literal {
+            Literal::Literal(value) => {
+                if self.literals.contains(literal) {
+                    self.set_state(State::SATISFIABLE);       
+                } else if self.literals.contains(&Literal::ComplementedLiteral(value.to_owned())) {
+                    self.literals.remove(&Literal::ComplementedLiteral(value.to_owned()));
+                    if self.is_empty() {
+                        self.set_state(State::UNSATISFIABLE);
+                    }
+                }
+            },
+            Literal::ComplementedLiteral(value) => {
+                if self.literals.contains(literal) {
+                    self.literals.remove(&Literal::Literal(value.to_owned()));
+                    if self.is_empty() {
+                        self.set_state(State::UNSATISFIABLE);
+                    }
+                } else if self.literals.contains(&Literal::Literal(value.to_owned())) {
+                    self.set_state(State::SATISFIABLE);       
+                }
+            }
+        }
+    }
 }
+
+
+impl Hash for Clause {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let literals: Vec<_> = self.literals.iter().collect();
+        literals.hash(state);
+        self.state.hash(state);
+    }
+}
+
 
 #[derive(Debug)]
 struct CNF {
     clauses: Vec<Clause>,
+    state: State
 }
 
 impl CNF {
     fn new() -> Self {
-        Self { clauses: vec![] }
+        Self { clauses: Vec::new(), state: State::UNDERTIMINED }
     }
     fn add(&mut self, clause: Clause) {
         self.clauses.push(clause);
     }
-}
+    fn is_empty(&self) -> bool {
+        self.clauses.is_empty()
+    }
 
-fn reduce(cnf: CNF, literal: Literal) -> CNF {
-    let mut reduced_cnf = CNF::new();
-    for clause in cnf.clauses.iter() {
-        let mut reduced_clause = Clause::new();
-        for lit in clause.literals.iter() {
-            match (&literal, &lit) {
-                (Literal::Literal(value1), Literal::ComplementedLiteral(value2))
-                    if value1 == value2 =>
-                {
-                    reduced_clause.clear();
-                    break;
-                }
-                (Literal::Literal(value1), Literal::Literal(value2)) if value1 == value2 => {}
-                _ => reduced_clause.add(lit.clone()),
+    fn is_statifiable(&self) -> bool{
+        self.state == State::SATISFIABLE
+    }
+
+    fn set_state(&mut self, state: State){
+        self.state = state;
+    }
+
+    fn reduce(&mut self, literal: Literal){
+        let mut state = State::SATISFIABLE;
+        for clause in self.clauses.iter_mut() {
+            if clause.is_statifiable() {
+                continue;
+            }
+            clause.reduce(&literal);
+            if clause.is_unstatifiable() {
+                state = State::UNSATISFIABLE;
+                break;
+            } else if clause.is_undertimed() {
+                state = State::UNDERTIMINED;
             }
         }
-        if !reduced_clause.is_empty() {
-            reduced_cnf.add(reduced_clause);
-        }
+        self.set_state(state);
     }
-    reduced_cnf
 }
+
 
 fn parse_cnf(cnf: &str) -> Option<CNF> {
     let modified_cnf = cnf.to_lowercase().replace(" ", "");
@@ -109,8 +179,11 @@ fn main() {
     println!("Group literal => ()");
     print!("\n\n");
     println!("Enter a CNF: ");
+    println!("(a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)");
     let cnf_str = "(a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)";
-    let cnf = parse_cnf(cnf_str);
-    let r = reduce(cnf.unwrap(), Literal::Literal('a'));
-    dbg!(r);
+    let mut cnf = parse_cnf(cnf_str).unwrap();
+    cnf.reduce(Literal::Literal('a'));
+    cnf.reduce(Literal::Literal('c'));
+    cnf.reduce(Literal::Literal('b'));
+    dbg!(cnf);
 }
