@@ -1,6 +1,7 @@
 use std::hash::{Hash, Hasher};
 use std::collections::HashSet;
 
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum Literal {
     Literal(char),
@@ -54,29 +55,33 @@ impl Clause {
         self.state = state;
     }
 
-    fn reduce(&mut self, literal:&Literal) {
+    fn reduce(&self, literal:&Literal) -> Clause {
+        let mut reduced_clause = Self { literals: self.literals.clone(), state:State::UNDERTIMINED };
         match literal {
             Literal::Literal(value) => {
-                if self.literals.contains(literal) {
-                    self.set_state(State::SATISFIABLE);       
-                } else if self.literals.contains(&Literal::ComplementedLiteral(value.to_owned())) {
-                    self.literals.remove(&Literal::ComplementedLiteral(value.to_owned()));
-                    if self.is_empty() {
-                        self.set_state(State::UNSATISFIABLE);
+                if reduced_clause.literals.contains(literal) {
+                    reduced_clause.literals.remove(&Literal::Literal(value.to_owned()));
+                    reduced_clause.set_state(State::SATISFIABLE);       
+                } else if reduced_clause.literals.contains(&Literal::ComplementedLiteral(value.to_owned())) {
+                    reduced_clause.literals.remove(&Literal::ComplementedLiteral(value.to_owned()));
+                    if reduced_clause.is_empty() {
+                        reduced_clause.set_state(State::UNSATISFIABLE);
                     }
                 }
             },
             Literal::ComplementedLiteral(value) => {
-                if self.literals.contains(literal) {
-                    self.literals.remove(&Literal::Literal(value.to_owned()));
-                    if self.is_empty() {
-                        self.set_state(State::UNSATISFIABLE);
+                if reduced_clause.literals.contains(literal) {
+                    reduced_clause.literals.remove(&Literal::Literal(value.to_owned()));
+                    if reduced_clause.is_empty() {
+                        reduced_clause.set_state(State::UNSATISFIABLE);
                     }
-                } else if self.literals.contains(&Literal::Literal(value.to_owned())) {
-                    self.set_state(State::SATISFIABLE);       
+                } else if reduced_clause.literals.contains(&Literal::Literal(value.to_owned())) {
+                    reduced_clause.literals.remove(&Literal::ComplementedLiteral(value.to_owned()));
+                    reduced_clause.set_state(State::SATISFIABLE);       
                 }
             }
         }
+        reduced_clause
     }
 }
 
@@ -115,31 +120,54 @@ impl CNF {
         self.state = state;
     }
 
-    fn reduce(&mut self, literal: Literal){
+    fn reduce(&mut self, literal: Literal) -> CNF {
         let mut state = State::SATISFIABLE;
+        let mut reduced_cnf = Self { 
+            clauses: Vec::new(),
+            state: State::UNDERTIMINED
+        };
         for clause in self.clauses.iter_mut() {
             if clause.is_statifiable() {
                 continue;
             }
-            clause.reduce(&literal);
-            if clause.is_unstatifiable() {
+            let reduced_clause = clause.reduce(&literal);
+            if reduced_clause.is_unstatifiable() {
                 state = State::UNSATISFIABLE;
                 break;
-            } else if clause.is_undertimed() {
+            } else if reduced_clause.is_undertimed() {
                 state = State::UNDERTIMINED;
             }
+            reduced_cnf.clauses.push(reduced_clause);
         }
-        self.set_state(state);
+        reduced_cnf.set_state(state);
+        reduced_cnf
     }
 }
 
 
-fn parse_cnf(cnf: &str) -> Option<CNF> {
+struct CNFWrapper {
+    cnf: CNF,
+    literals: HashSet<char>
+}
+
+
+impl CNFWrapper {
+    fn new() -> Self {
+        Self {
+            cnf: CNF::new(),
+            literals: HashSet::new()
+        }
+    }
+}
+
+
+fn parse_cnf(cnf: &str) -> Option<CNFWrapper> {
     let modified_cnf = cnf.to_lowercase().replace(" ", "");
     let clauses: Vec<&str> = modified_cnf.split("&&").collect();
     if clauses.is_empty() {
         None
     } else {
+        let mut cnf_wrapper = CNFWrapper::new();
         let clauses: Vec<Vec<&str>> = clauses
             .iter()
             .map(|&clause| {
@@ -151,10 +179,11 @@ fn parse_cnf(cnf: &str) -> Option<CNF> {
             })
             .collect();
 
-        let mut cnf = CNF::new();
+        let cnf = &mut cnf_wrapper.cnf;
         for clause in clauses.iter() {
             let mut c = Clause::new();
             for literal in clause.iter() {
+                cnf_wrapper.literals.insert(literal.chars().nth(0).unwrap().to_owned());
                 if literal.chars().count() == 1 {
                     c.add(Literal::Literal(literal.chars().nth(0).unwrap().to_owned()));
                 } else {
@@ -165,9 +194,40 @@ fn parse_cnf(cnf: &str) -> Option<CNF> {
             }
             cnf.add(c);
         }
-        Some(cnf)
+        Some(cnf_wrapper)
     }
 }
+
+
+fn dpll(cnf: &mut CNF, literals:&mut HashSet<char>) -> State {
+
+    if literals.is_empty() {
+        return State::UNSATISFIABLE;
+    }
+
+    let literal = literals.iter().next().cloned().unwrap();
+    literals.remove(&literal);
+
+    let mut reduced_cnf = cnf.reduce(Literal::Literal(literal));
+    if reduced_cnf.is_statifiable() {
+        return State::SATISFIABLE;
+    }
+
+    let state = dpll(&mut reduced_cnf, literals);        
+    if state == State::SATISFIABLE {
+        return State::SATISFIABLE
+    }
+
+    let mut reduced_cnf = cnf.reduce(Literal::ComplementedLiteral(literal));
+    if reduced_cnf.is_statifiable() {
+        return State::SATISFIABLE
+    }
+    let state = dpll(&mut reduced_cnf, literals);
+
+    literals.insert(literal);
+    state
+}
+   
 
 fn main() {
     println!("==== SAT SOLVER ====\n");
@@ -177,13 +237,20 @@ fn main() {
     println!("Complement => '");
     println!("Literals => any character");
     println!("Group literal => ()");
+    println!("Example CNF: (a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)");
     print!("\n\n");
     println!("Enter a CNF: ");
-    println!("(a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)");
     let cnf_str = "(a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)";
-    let mut cnf = parse_cnf(cnf_str).unwrap();
-    cnf.reduce(Literal::Literal('a'));
-    cnf.reduce(Literal::Literal('c'));
-    cnf.reduce(Literal::Literal('b'));
-    dbg!(cnf);
+    let mut cnf_wrapper = parse_cnf(cnf_str).unwrap();
+    dbg!(dpll(&mut cnf_wrapper.cnf, &mut cnf_wrapper.literals));
+    
+
+/*
+    let mut x = cnf_wrapper.cnf.reduce(Literal::Literal('a'));
+    println!("{:?}", x);
+    let mut x = x.reduce(Literal::Literal('c'));
+    println!("{:?}", x);
+    let mut x = x.reduce(Literal::Literal('b'));
+    println!("{:?}", x);
+*/
 }
