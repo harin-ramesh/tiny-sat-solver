@@ -1,1 +1,1 @@
-### tiny-sat-solver [WIP]
+### tiny-sat-solver
