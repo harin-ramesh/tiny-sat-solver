@@ -1,39 +1,9 @@
-mod parser;
-mod core;
 
-use std::collections::HashSet;
-
-use parser::parse_cnf;
-use core::{CNF, Literal, State};
+use sat_solver::parser::parse_cnf;
+use sat_solver::core::State;
+use sat_solver::algorithms::dpll;
 
 
-fn dpll(cnf: &mut CNF, literals:&mut HashSet<char>) -> State {
-
-    if literals.is_empty() {
-        return State::UNSATISFIABLE;
-    }
-
-    let literal = literals.iter().next().cloned().unwrap();
-    literals.remove(&literal);
-
-    let mut reduced_cnf = cnf.reduce(Literal::Literal(literal));
-    if reduced_cnf.is_statifiable() {
-        return State::SATISFIABLE;
-    }
-
-    let state = dpll(&mut reduced_cnf, literals);        
-    if state == State::SATISFIABLE {
-        return State::SATISFIABLE
-    }
-
-    let mut reduced_cnf = cnf.reduce(Literal::ComplementedLiteral(literal));
-    if reduced_cnf.is_statifiable() {
-        return State::SATISFIABLE
-    }
-    let state = dpll(&mut reduced_cnf, literals);
-    literals.insert(literal);
-    state
-}
  
 
 fn main() {
