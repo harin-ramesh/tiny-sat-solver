@@ -1,20 +1,12 @@
 ### tiny-sat-solver
 
-Input => CNF expression
-OR => ||
-AND => &&
-Complement => '
-Literals => any character
-Group literal => ()
+This is a simple sat solver using dpll algorithm, this is a very simple implementation.
 
-Current this sat solver uses dpll as algorithm.
-
+##### CNF example supported:
 ```
-CNF example:
 (a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)
 (a)&&(a')
 ```
-
 
 ---
 #### How to use
