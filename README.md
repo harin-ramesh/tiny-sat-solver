@@ -2,12 +2,6 @@
 
 This is a simple sat solver using dpll algorithm, this is a very simple implementation.
 
-##### CNF example supported:
-```
-(a || b || c) && (a’ || b’|| c) && (a’|| b || c’) && (a || b’ || c’)
-(a)&&(a')
-```
-
 ---
 #### How to use
 ###### Clone the the repo
